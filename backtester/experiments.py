@@ -113,7 +113,8 @@ def parameter_grid(thresholds, windows) -> pd.DataFrame:
             b = summarize_portfolio(common_dates(benchmarks), cost)
             rows.append({"threshold": threshold, "window": window,
                          "sharpe_diff": s["Sharpe"] - b["Sharpe"],
-                         "strategy_sharpe": s["Sharpe"], "trades": s["Trades"]})
+                         "strategy_sharpe": s["Sharpe"], "trades": s["Trades"],
+                         "strategy_cagr": s["CAGR"], "strategy_max_dd": s["Max DD"]})
     return pd.DataFrame(rows)
 
 

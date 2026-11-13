@@ -259,12 +259,13 @@ def criteria_html() -> str:
 
 # ---------------------------------------------------------------- 3D surface (own file)
 
-# Only these metrics were saved by robustness.py, so only these can be shown
-# without re-running the grid.
+# Every metric here is a column saved by robustness.py in parameter_grid.csv.
 SURFACE_METRICS = {
     "sharpe_diff": ("Sharpe minus buy & hold", "+.2f",
                     [[0, "#e34948"], [0.5, "#f0efec"], [1, "#3987e5"]]),
     "strategy_sharpe": ("Strategy Sharpe", ".2f", "Blues"),
+    "strategy_cagr": ("Strategy CAGR", ".1%", "Blues"),
+    "strategy_max_dd": ("Strategy max drawdown", ".1%", "Blues"),
     "trades": ("Number of trades", ".0f", "Blues"),
 }
 
@@ -288,7 +289,8 @@ def surface_figure() -> go.Figure:
         start = len(fig.data)
         surface = dict(z=z.to_numpy(), x=x, y=windows, colorscale=scale, opacity=0.85,
                        customdata=trades, name=label, visible=visible,
-                       colorbar=dict(title=label, len=0.7, outlinewidth=0),
+                       colorbar=dict(title=label, len=0.7, outlinewidth=0,
+                                     tickformat=".0%" if "%" in fmt else ""),
                        hovertemplate=(f"entry %{{x:.0f}}% below MA, window %{{y}} days<br>"
                                       f"{label}: %{{z:{fmt}}}<br>trades: %{{customdata}}<extra></extra>"))
         if col == "sharpe_diff":
@@ -326,8 +328,10 @@ def surface_figure() -> go.Figure:
     buttons = []
     for (col, (label, _, _)), idx in zip(SURFACE_METRICS.items(), traces_per_metric):
         vis = [i in idx for i in range(len(fig.data))]
+        tickformat = ".0%" if "%" in SURFACE_METRICS[col][1] else ""
         buttons.append(dict(label=label, method="update",
-                            args=[{"visible": vis}, {"scene.zaxis.title.text": label}]))
+                            args=[{"visible": vis}, {"scene.zaxis.title.text": label,
+                                                     "scene.zaxis.tickformat": tickformat}]))
     fig.update_layout(
         template="plotly_dark", paper_bgcolor="#0d0d0d", height=720,
         font=dict(family=FONT, color="#c3c2b7"),
