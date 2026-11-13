@@ -28,7 +28,10 @@ def bootstrap_sharpe_diff(strategy: pd.Series, benchmark: pd.Series, cash_ret: p
     The success test in PREREGISTRATION.md needs the whole interval above 0.
     """
     pair = pd.concat([strategy, benchmark], axis=1).dropna()
-    cash = cash_ret.reindex(pair.index).to_numpy()
+    cash = cash_ret.reindex(pair.index)
+    if cash.isna().any():
+        raise ValueError(f"cash return missing on {int(cash.isna().sum())} days")
+    cash = cash.to_numpy()
     excess = pair.to_numpy() - cash[:, None]          # both columns minus cash
     n = len(excess)
     if n < 2 * block:

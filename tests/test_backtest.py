@@ -98,3 +98,19 @@ def test_equal_weight_fills_a_missing_day_with_zero_not_dropping_the_day():
     b = pd.Series([0.0, 0.06], index=d[[0, 2]])  # b has no row on the middle day
     port = equal_weight({"a": a, "b": b})
     assert list(port) == pytest.approx([0.0, 0.015, 0.035])
+
+
+def test_portfolio_cash_covers_days_missing_from_one_bank():
+    from backtester.backtest import portfolio_cash
+    d = pd.bdate_range("2021-01-04", periods=3)
+    a = pd.DataFrame({"cash_ret": [0.0, 0.0001, 0.0001]}, index=d)
+    b = pd.DataFrame({"cash_ret": [0.0, 0.0001]}, index=d[[0, 2]])   # b misses day 1
+    cash = portfolio_cash({"b": b, "a": a})
+    assert not cash.isna().any() and len(cash) == 3
+
+
+def test_sharpe_refuses_missing_cash_days():
+    from backtester.metrics import sharpe
+    net = pd.Series([0.01, -0.01, 0.02], index=pd.bdate_range("2021-01-04", periods=3))
+    with pytest.raises(ValueError):
+        sharpe(net, net.iloc[:2] * 0)

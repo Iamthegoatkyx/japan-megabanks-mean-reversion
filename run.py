@@ -1,4 +1,4 @@
-"""Run the preregistered strategy and the buy-and-hold benchmark.
+"""Run the preregistered strategy and buy-and-hold, and write the results.
 
 Usage:
     python run.py                         # IN-SAMPLE only (before 2018), the default
@@ -7,14 +7,20 @@ Usage:
 
 PREREGISTRATION.md says the out-of-sample period is looked at ONCE, so that
 run needs the extra --confirm flag, to make it hard to do by accident.
+
+Writes outputs/<period>/<bank>/results.md (+ equity_drawdown.png, trades.csv)
+and outputs/<period>/portfolio/results.md with the preregistered test.
 """
 import argparse
-
-import pandas as pd
+from pathlib import Path
 
 from backtester import config
-from backtester.experiments import common_dates, run_universe
+from backtester.backtest import equal_weight
+from backtester.experiments import (common_dates, cost_sensitivity, criteria_markdown,
+                                    preregistered_test, run_universe)
 from backtester.metrics import markdown_table, summarize, summarize_portfolio, trade_list
+from backtester.plots import cost_chart
+from backtester.report import data_fingerprint, write_results
 
 
 def main() -> None:
@@ -26,34 +32,56 @@ def main() -> None:
     if args.period == "out-of-sample" and not args.confirm:
         raise SystemExit("Out-of-sample is run once (PREREGISTRATION.md). Add --confirm if you mean it.")
 
+    period = args.period
+    out = Path("outputs") / period
     universe = config.UNIVERSES[config.MAIN_UNIVERSE]
     cost = universe["cost_bps"]
-    strategies, benchmarks = run_universe(args.period)
+    common_notes = [f"Costs: {cost:g} bps per side. Cash: JPY call rate, FRED "
+                    f"`{universe['cash_rate_fred_id']}`.",
+                    f"Rule: {config.ENTRY_BELOW_MA:.0%} below the {config.MA_WINDOW}-day MA, "
+                    f"max hold {config.MAX_HOLD_DAYS} days, stop {config.STOP_LOSS:.0%}, "
+                    "reset rule (see PREREGISTRATION.md)."]
 
-    rows = {}
-    for name in strategies:
-        bt = strategies[name]
-        print(f"{name}: {bt.index[0].date()} to {bt.index[-1].date()}")
-        rows[f"{name} strategy"] = summarize(bt, cost)
-        rows[f"{name} buy & hold"] = summarize(benchmarks[name], cost)
+    strategies, benchmarks = run_universe(period)
+    all_rows = {}
+    for ticker, name in universe["tickers"].items():
+        s_bt, b_bt = strategies[name], benchmarks[name]
+        rows = {"Strategy": summarize(s_bt, cost), "Buy & hold": summarize(b_bt, cost)}
+        all_rows[f"{name} strategy"], all_rows[f"{name} buy & hold"] = rows.values()
+        write_results(out / ticker, f"{name} ({ticker})", period, s_bt["net"], b_bt["net"],
+                      rows, common_notes + [f"Data: {data_fingerprint(ticker)}."],
+                      trades=trade_list(s_bt, cost))
 
-    # The portfolio needs all three banks, so it starts when the youngest one does.
+    # ---- the portfolio, which is what the preregistered test is about
     port_s, port_b = common_dates(strategies), common_dates(benchmarks)
-    first = next(iter(port_s.values())).index
-    print(f"Portfolio: {first[0].date()} to {first[-1].date()}\n")
-    rows["Portfolio strategy"] = summarize_portfolio(port_s, cost)
-    rows["Portfolio buy & hold"] = summarize_portfolio(port_b, cost)
+    rows = {"Strategy": summarize_portfolio(port_s, cost),
+            "Buy & hold": summarize_portfolio(port_b, cost)}
+    all_rows["Portfolio strategy"], all_rows["Portfolio buy & hold"] = rows.values()
 
-    print(f"Period: {args.period}  |  costs {cost:g} bps per side  |  "
-          f"cash: {universe['cash_rate_fred_id']}\n")
-    print(markdown_table(rows))
+    costs = cost_sensitivity(period)
+    costs.to_csv(out / "cost_sensitivity.csv")
+    cost_chart(costs, out / "cost_sensitivity.png", f"{period}: portfolio Sharpe vs trading cost",
+               preregistered_bps=cost)
+    test = preregistered_test(strategies, benchmarks, period)
 
-    gap_trades = pd.concat(
-        [trade_list(bt, cost).assign(bank=n) for n, bt in strategies.items()])
-    gap_trades = gap_trades[gap_trades["crosses_gap"]]
-    if not gap_trades.empty:
-        print("\nTrades open across a data gap (check by hand):")
-        print(gap_trades.to_string(index=False))
+    extra = [criteria_markdown(test, period), "",
+             "## Cost sensitivity", "", "```", costs.round(3).to_string(), "```", "",
+             "![Cost sensitivity](../cost_sensitivity.png)"]
+    if period == "in-sample":
+        extra += ["", "## Parameter grid (in-sample only)", "",
+                  "![Parameter heatmap](../parameter_heatmap.png)",
+                  "", "Made by `robustness.py`. A diagnostic, not a way to pick settings."]
+    write_results(out / "portfolio", "Equal-weight portfolio (MUFG, SMFG, Mizuho)", period,
+                  equal_weight({n: bt["net"] for n, bt in port_s.items()}),
+                  equal_weight({n: bt["net"] for n, bt in port_b.items()}),
+                  rows, common_notes + ["Daily rebalanced to 1/3 each; rebalancing costs ignored."],
+                  extra_md="\n".join(extra))
+
+    # ---- the same headline numbers on screen
+    print(f"Period: {period}\n")
+    print(markdown_table(all_rows), "\n")
+    print(criteria_markdown(test, period))
+    print(f"\nWritten to {out}/")
 
 
 if __name__ == "__main__":

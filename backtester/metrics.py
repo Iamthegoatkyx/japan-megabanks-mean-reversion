@@ -16,7 +16,11 @@ def sharpe(net: pd.Series, cash_ret: pd.Series) -> float:
     We subtract the cash return because a strategy that sits in cash shouldn't
     get credit for the interest; Sharpe asks "how much extra for the risk?".
     """
-    excess = net - cash_ret.reindex(net.index)
+    cash = cash_ret.reindex(net.index)
+    if cash.isna().any():
+        # Fail loudly: pandas would silently skip these days in mean() and std().
+        raise ValueError(f"cash return missing on {int(cash.isna().sum())} days")
+    excess = net - cash
     sd = excess.std(ddof=1)
     if sd == 0 or np.isnan(sd):
         return float("nan")
@@ -126,15 +130,14 @@ def summarize_portfolio(bank_bts: dict[str, pd.DataFrame], cost_bps: float) -> d
     return is the average of the banks' daily returns (see equal_weight).
     Trades are the total number of closed trades across all the banks.
     """
-    from .backtest import equal_weight
+    from .backtest import equal_weight, portfolio_cash
 
     net = equal_weight({name: bt["net"] for name, bt in bank_bts.items()})
-    any_bt = next(iter(bank_bts.values()))       # same JPY cash rate for every bank
     per_bank = [summarize(bt, cost_bps) for bt in bank_bts.values()]
     return {
         "CAGR": cagr(net),
         "Vol": float(net.std(ddof=1) * np.sqrt(TRADING_DAYS)),
-        "Sharpe": sharpe(net, any_bt["cash_ret"]),
+        "Sharpe": sharpe(net, portfolio_cash(bank_bts)),
         "Max DD": max_drawdown(net),
         "In market": float(np.mean([s["In market"] for s in per_bank])),
         "Trades": int(sum(s["Trades"] for s in per_bank)),

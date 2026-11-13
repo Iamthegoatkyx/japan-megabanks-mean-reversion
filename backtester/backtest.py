@@ -107,3 +107,15 @@ def equal_weight(returns_by_stock: dict[str, pd.Series]) -> pd.Series:
     common_start = max(r.first_valid_index() for r in returns_by_stock.values())
     table = table.loc[common_start:].fillna(0.0)
     return table.mean(axis=1).rename("equal_weight")
+
+
+def portfolio_cash(bts: dict[str, pd.DataFrame]) -> pd.Series:
+    """The daily cash return for a portfolio of backtests.
+
+    Every bank earns the same JPY rate, but cleaning removed different days
+    from different banks, so we can't just take one bank's column: it would be
+    missing on days only the others have. For each day, take the first bank
+    that has a value (they're all the same number).
+    """
+    table = pd.concat({name: bt["cash_ret"] for name, bt in bts.items()}, axis=1, sort=True)
+    return table.bfill(axis=1).iloc[:, 0].rename("cash_ret")

@@ -112,3 +112,66 @@ def parameter_grid(thresholds, windows) -> pd.DataFrame:
                          "sharpe_diff": s["Sharpe"] - b["Sharpe"],
                          "strategy_sharpe": s["Sharpe"], "trades": s["Trades"]})
     return pd.DataFrame(rows)
+
+
+def preregistered_test(strategies: dict, benchmarks: dict, period: str) -> dict:
+    """Apply the success criteria from PREREGISTRATION.md, mechanically.
+
+    `strategies` / `benchmarks` are the 15 bps backtests from run_universe.
+    This only checks the written rules; what the result MEANS is for the README.
+    """
+    from .backtest import equal_weight, portfolio_cash
+    from .stats import bootstrap_sharpe_diff
+
+    port_s, port_b = common_dates(strategies), common_dates(benchmarks)
+    cost = config.UNIVERSES[config.MAIN_UNIVERSE]["cost_bps"]
+    s, b = summarize_portfolio(port_s, cost), summarize_portfolio(port_b, cost)
+    boot = bootstrap_sharpe_diff(
+        equal_weight({n: bt["net"] for n, bt in port_s.items()}),
+        equal_weight({n: bt["net"] for n, bt in port_b.items()}),
+        portfolio_cash(port_s))
+
+    s25_runs, b25_runs = run_universe(period, cost_bps=25)
+    s25 = summarize_portfolio(common_dates(s25_runs), 25)
+    b25 = summarize_portfolio(common_dates(b25_runs), 25)
+
+    criteria = [
+        ("1. Sharpe higher than buy & hold at 15 bps",
+         f"{s['Sharpe']:.2f} vs {b['Sharpe']:.2f}", s["Sharpe"] > b["Sharpe"]),
+        ("2. 95% bootstrap interval of Sharpe difference entirely above 0",
+         f"[{boot['ci_low']:.2f}, {boot['ci_high']:.2f}]", boot["ci_low"] > 0),
+        ("3. Sharpe still higher at 25 bps",
+         f"{s25['Sharpe']:.2f} vs {b25['Sharpe']:.2f}", s25["Sharpe"] > b25["Sharpe"]),
+        ("4. At least 20 closed trades in total", str(s["Trades"]), s["Trades"] >= 20),
+    ]
+    sharpe_gap = s["Sharpe"] - b["Sharpe"]
+    dd_better_by = s["Max DD"] - b["Max DD"]           # both negative; positive = smaller DD
+    partial = [
+        ("Sharpe within ±0.10 of buy & hold", f"{sharpe_gap:+.2f}", abs(sharpe_gap) <= 0.10),
+        ("Max drawdown at least 10 points smaller", f"{dd_better_by * 100:+.1f} points",
+         dd_better_by >= 0.10),
+    ]
+    if all(met for *_, met in criteria):
+        outcome = "WORKS (all four criteria met)"
+    elif all(met for *_, met in partial):
+        outcome = "PARTIAL: risk reduction, not an edge"
+    else:
+        outcome = "DOES NOT WORK (by the preregistered criteria)"
+    return {"criteria": criteria, "partial": partial, "outcome": outcome,
+            "bootstrap": boot, "strategy": s, "benchmark": b}
+
+
+def criteria_markdown(result: dict, period: str) -> str:
+    """The preregistered test as a markdown section."""
+    lines = ["## Preregistered test" + ("" if period == "out-of-sample"
+             else " (in-sample, FOR REFERENCE ONLY: the real test is out-of-sample)"), "",
+             "| Criterion | Value | Met? |", "|---|---|---|"]
+    lines += [f"| {c} | {v} | {'yes' if m else 'no'} |" for c, v, m in result["criteria"]]
+    lines += ["", "Partial-result check:", "", "| Condition | Value | Met? |", "|---|---|---|"]
+    lines += [f"| {c} | {v} | {'yes' if m else 'no'} |" for c, v, m in result["partial"]]
+    boot = result["bootstrap"]
+    lines += ["", f"**Mechanical outcome: {result['outcome']}**", "",
+              f"Bootstrap: {boot['n_boot']} resamples, {boot['block']}-day blocks, "
+              f"observed difference {boot['observed_diff']:+.3f}, share of resamples where "
+              f"the strategy is not better: {boot['share_not_better']:.1%}."]
+    return "\n".join(lines)

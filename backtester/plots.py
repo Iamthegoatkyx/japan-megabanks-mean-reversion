@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import matplotlib
+import matplotlib.ticker
 
 matplotlib.use("Agg")  # draw to files, no window needed
 import matplotlib.pyplot as plt
@@ -99,6 +100,43 @@ def cost_chart(costs: pd.DataFrame, path, title: str, preregistered_bps=None) ->
     ax.set_xlim(x[0] - 2, x[-1] + 12)
     ax.legend(frameon=False, labelcolor=INK_2, loc="lower left")
     ax.set_title(title, color=INK, loc="left", fontsize=11)
+    fig.tight_layout()
+    fig.savefig(path, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+
+
+def equity_chart(strategy_net: pd.Series, benchmark_net: pd.Series, path, title: str) -> None:
+    """Top: growth of 1 yen (log scale). Bottom: drawdown from the previous peak.
+
+    Log scale because over many years a fall from 2.0 to 1.0 and from 1.0 to
+    0.5 are both -50%, and should look the same size.
+    """
+    fig, (top, bottom) = plt.subplots(2, 1, figsize=(9, 6), sharex=True, facecolor=SURFACE,
+                                      gridspec_kw={"height_ratios": [2, 1]})
+    for ax in (top, bottom):
+        _style(ax)
+    for net, label, colour in [(strategy_net, "Strategy", STRATEGY),
+                               (benchmark_net, "Buy & hold", BENCHMARK)]:
+        equity = (1 + net).cumprod()
+        drawdown = equity / np.maximum(equity.cummax(), 1.0) - 1
+        top.plot(equity.index, equity, color=colour, linewidth=2, label=label)
+        top.annotate(f"{label} {equity.iloc[-1]:.2f}", (equity.index[-1], equity.iloc[-1]),
+                     xytext=(6, 0), textcoords="offset points", va="center",
+                     color=INK_2, fontsize=9)
+        bottom.plot(drawdown.index, drawdown, color=colour, linewidth=1.5)
+    top.set_yscale("log")
+    # Plain numbers (0.5, 1, 2) instead of 10^-1-style labels.
+    plain = matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}")
+    top.yaxis.set_major_formatter(plain)
+    top.yaxis.set_minor_formatter(plain)
+    top.tick_params(axis="y", which="minor", labelsize=8, labelcolor=MUTED, length=0)
+    top.axhline(1.0, color=BASELINE, linewidth=1)
+    top.set_ylabel("Growth of ¥1 (log)", color=INK_2)
+    top.legend(frameon=False, labelcolor=INK_2, loc="lower left")
+    bottom.axhline(0, color=BASELINE, linewidth=1)
+    bottom.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0, decimals=0))
+    bottom.set_ylabel("Drawdown", color=INK_2)
+    top.set_title(title, color=INK, loc="left", fontsize=11)
     fig.tight_layout()
     fig.savefig(path, dpi=150, facecolor=SURFACE)
     plt.close(fig)
