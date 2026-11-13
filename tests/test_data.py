@@ -66,6 +66,17 @@ def test_cash_rate_uses_each_days_own_month_and_carries_forward():
     assert list(daily) == [0.001, 0.002, 0.002]
 
 
+def test_cash_rate_with_many_trading_days_in_the_same_month():
+    # The real case: ~20 trading days share each monthly value.
+    monthly = pd.Series([0.001, 0.002],
+                        index=pd.to_datetime(["2024-01-01", "2024-02-01"]))
+    days = pd.bdate_range("2024-01-02", "2024-02-29")
+    daily = daily_cash_rate(monthly, days)
+    assert len(daily) == len(days)
+    assert (daily[daily.index.month == 1] == 0.001).all()
+    assert (daily[daily.index.month == 2] == 0.002).all()
+
+
 def make_ohlcv(rows, start="2020-01-06"):
     """Rows of (open, high, low, close, volume) on consecutive business days."""
     dates = pd.bdate_range(start, periods=len(rows))

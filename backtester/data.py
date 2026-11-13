@@ -170,6 +170,9 @@ def daily_cash_rate(monthly_rate: pd.Series, trading_days: pd.DatetimeIndex) -> 
     decision, so using the same month's value is not look-ahead.
     """
     month_start = trading_days.to_period("M").to_timestamp()
-    rate = monthly_rate.reindex(month_start.union(monthly_rate.index)).ffill()
-    return pd.Series(rate.loc[month_start].to_numpy(), index=trading_days,
+    # One rate per month: every published month plus every month we trade in,
+    # each listed ONCE (many trading days share a month), filled forward.
+    all_months = month_start.unique().union(monthly_rate.index)
+    rate_by_month = monthly_rate.reindex(all_months).ffill()
+    return pd.Series(rate_by_month.reindex(month_start).to_numpy(), index=trading_days,
                      name="cash_rate")
