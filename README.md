@@ -89,12 +89,67 @@ folder per bank next to each.
 
 ## Results
 
-<!-- Written by me. -->
+The pre-registered rule failed. Out-of-sample (4 Jan 2018 to 13 Nov 2026),
+after 15 bps per side, an equal-weight portfolio of the strategy on MUFG,
+SMFG and Mizuho barely broke even, while buy-and-hold of the same banks
+grew almost sixfold.
+
+| Out-of-sample, portfolio | Strategy | Buy & hold |
+|---|---:|---:|
+| Sharpe | 0.05 | 0.89 |
+| CAGR | 0.1% | 22.0% |
+| Max drawdown | -29.7% | -47.5% |
+| Time in market | 8.6% | 100% |
+| ¥1 grew to | ¥1.01 | ¥5.84 |
+
+Against the success criteria I set before any data existed:
+
+| Criterion | Result | Met? |
+|---|---|---|
+| Higher Sharpe at 15 bps | 0.05 vs 0.89 | No |
+| Bootstrap 95% interval above 0 | [-1.54, -0.15] | No |
+| Higher Sharpe at 25 bps | 0.00 vs 0.89 | No |
+| At least 20 trades | 60 | Yes |
+
+The partial-result test also failed: the drawdown was 17.8 points smaller,
+but the Sharpe gap (-0.84) was far outside ±0.10. In-sample (Oct 2005 to
+Dec 2017) the rule also lagged, with a Sharpe of -0.04 against 0.07. In
+the 42-combination parameter grid there was no smooth region where the
+rule beat buy-and-hold; my pre-registered cell scored -0.07.
 
 ## Why it might not work
 
-<!-- Written by me. -->
+1. **It is rarely in the market.** The rule held stock only 8–17% of the
+   time and earned a near-zero yen cash rate the rest. Mizuho shows this
+   best: a 71% win rate and +1.8% per trade out-of-sample, but 3.7% a year
+   against 21.3% for buy-and-hold.
+2. **Slow drifts lose money, not just crashes.** In-sample, 57 trades hit
+   the 15-day time stop (average -3.5%), more than the 31 that hit the
+   stop-loss (average -11.3%).
+3. **The stop-loss overshoots.** Selling one day after the signal means
+   stops lost 11.3% on average, not 10%.
+4. **Costs eat what edge there is.** The portfolio's out-of-sample Sharpe
+   falls from 0.12 at 0 bps to -0.11 at 50 bps.
+5. **The regime matters.** My hypothesis, which I haven't tested: before
+   2018, buying dips during Japan's long bank decline often meant catching
+   falling knives. After 2018, and especially as bank stocks rallied
+   strongly in the 2020s, the strategy sat in cash while buy-and-hold
+   captured the gains.
 
 ## Limitations
 
-<!-- Written by me. -->
+- **Small scope:** one market, three closely related stocks, one rule and
+  60 out-of-sample trades.
+- **One data source:** only Yahoo Finance. I couldn't check prices against
+  a second source because Stooq blocked automated downloads.
+- **Cleaned-out days:** removing bad rows in 2007–08 leaves gaps where the
+  price path is hidden. No strategy trade crossed one.
+- **Outside knowledge:** I knew Japanese banks rallied in 2023–26 before
+  choosing them. Git proves when I wrote the rule, not what I already knew.
+- **Untested explanation:** what drove the banks' rally (for example,
+  expectations of higher Japanese rates) is my reading, not something
+  this project tested.
+- **Simple execution model:** trades at the next close with a flat cost
+  and no taxes, so market impact and price gaps within a day aren't modelled.
+- **Weekly paper log:** checking once a week misses trades that start and
+  end within the same week.
