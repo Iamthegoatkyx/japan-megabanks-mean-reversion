@@ -60,6 +60,7 @@ pytest                         # all tests should pass
 | `python run.py` | in-sample backtest, writes `outputs/in-sample/` |
 | `python robustness.py` | in-sample cost sensitivity and parameter grid heatmap |
 | `python run.py --period out-of-sample --confirm` | the one-time out-of-sample test, writes `outputs/out-of-sample/` |
+| `python dashboard.py` | interactive charts: `outputs/dashboard.html` and the 3D grid `outputs/parameter_surface_3d.html` (visualisation only) |
 | `python live_signal.py` | paper trading: today's signal per bank, appended to `paper_log.csv` (run after the Tokyo close) |
 
 Prices are cached in `data/` (not committed; each `results.md` records the

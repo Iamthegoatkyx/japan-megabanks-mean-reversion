@@ -124,3 +124,5 @@ main test into a success.
 - **Made blind:** no signal, trade or return of the strategy had been
   computed. Only in-sample prices were looked at; the out-of-sample period
   will get the same rule without being inspected first.
+
+_Note (2026-11-13): `dashboard.py` (outputs/dashboard.html, outputs/parameter_surface_3d.html) is for visualisation only. It recomputes the out-of-sample series with the same code and cached data and changes no setting or decision; its out-of-sample exit-reason chart is the only figure not in the committed outputs._
