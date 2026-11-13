@@ -15,6 +15,10 @@ after trading costs?
 ## Data
 - Daily dividend-adjusted closes from Yahoo Finance (yfinance, `auto_adjust=True`).
 - Signals use closing prices only.
+- Data cleaning (Amendment 2), applied to the whole history of every stock
+  before anything else: drop rows with zero volume, and drop rows whose Open,
+  High, Low, Close and Volume are all identical to the previous row (keeping
+  the first). Code: `clean_prices` in `backtester/data.py`.
 - All returns are in JPY. No currency conversion.
 - Cash rate: Japan immediate rate (call money / interbank), % per year, monthly,
   OECD Main Economic Indicators via FRED, series `IRSTCI01JPM156N`.
@@ -92,3 +96,31 @@ main test into a success.
 - **Possible later robustness universes** (Korea, Hong Kong) are not part of
   the main test and may use their own cost assumptions, set in
   `backtester/config.py`.
+
+### Amendment 2 — 2026-11-13 — data-cleaning rule (before any signal or return)
+- **Problem found:** the in-sample quality check showed runs of 5+ identical
+  closes. Yahoo's own Volume column shows what they are:
+  - rows with **zero volume** and Open = High = Low = Close: exchange holidays
+    (e.g. 31 Dec – 3 Jan) and also real trading days Yahoo is missing
+    (e.g. MUFG 25–28 Sep 2007; SMFG and Mizuho 25–30 Dec 2008);
+  - rows that are **exact copies** of the previous day, volume included
+    (SMFG 17–22 May 2006 and 12–13 Dec 2006).
+- **Rule:** drop both kinds of row (details under Data). Same rule for all
+  three banks and for in-sample and out-of-sample data.
+- **Why zero volume instead of a TSE holiday calendar:** a holiday calendar
+  would catch the holidays but not the missing trading days in 2007 and 2008.
+  Zero volume catches both, and it's a fact about the market (no shares
+  traded), not about strategy performance.
+- **Consequences:** the missing trading days stay missing. The return across
+  such a gap covers several days, and the max-hold count uses trading days
+  present in the data, so a trade spanning a gap can last slightly longer in
+  calendar time.
+- **Second source:** Stooq was tried but blocks automated downloads, so the
+  stale runs were checked only against Yahoo's own Volume/High/Low fields.
+  That is not an independent source; listed under Limitations.
+- **In-sample signal check (allowed above), after cleaning:** about 4.2
+  (MUFG), 5.1 (SMFG) and 4.2 (Mizuho) entry episodes a year, an upper bound.
+  All are above 2 a year, so the 5% threshold is unchanged.
+- **Made blind:** no signal, trade or return of the strategy had been
+  computed. Only in-sample prices were looked at; the out-of-sample period
+  will get the same rule without being inspected first.

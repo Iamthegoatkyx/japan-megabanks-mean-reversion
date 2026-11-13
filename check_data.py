@@ -12,7 +12,7 @@ import argparse
 import pandas as pd
 
 from backtester import config
-from backtester.data import load_cash_rate, load_prices, quality_report
+from backtester.data import clean_prices, load_cash_rate, load_ohlcv, quality_report
 
 
 def count_entry_episodes(prices: pd.Series) -> int:
@@ -55,12 +55,16 @@ def main() -> None:
           f"{'FULL history' if args.full else f'in-sample only (before {split.date()})'}\n")
 
     for ticker, name in universe["tickers"].items():
-        prices = load_prices(ticker, refresh=args.refresh)
+        raw = load_ohlcv(ticker, refresh=args.refresh)
         if not args.full:
-            prices = prices[prices.index < split]
+            raw = raw[raw.index < split]
+        kept, dropped = clean_prices(raw)
+        prices = kept["Close"]
         report = quality_report(prices)
 
         print(f"=== {name} ({ticker})")
+        print(f"  rows dropped by cleaning: {len(dropped)} of {len(raw)}  "
+              f"{dropped['reason'].value_counts().to_dict()}")
         for key in ["first_date", "last_date", "trading_days",
                     "missing_values", "non_positive", "duplicate_dates"]:
             print(f"  {key}: {report[key]}")

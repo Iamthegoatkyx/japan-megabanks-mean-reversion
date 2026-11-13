@@ -10,39 +10,64 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 # ---------------------------------------------------------------- stock prices
 
-def download_prices(ticker: str) -> pd.Series:
-    """Download the full history of daily dividend-adjusted closes from Yahoo.
+def download_prices(ticker: str) -> pd.DataFrame:
+    """Download the full daily history (Open, High, Low, Close, Volume) from Yahoo.
 
     auto_adjust=True means Yahoo rescales past prices for dividends and splits,
     so the % change from one close to the next is the TOTAL return
     (price change + dividend). That is why we don't add dividends separately.
+    We keep Volume too, because it's how we spot fake rows (see clean_prices).
     """
     import yfinance as yf  # imported here so tests don't need the internet
 
     df = yf.download(ticker, period="max", auto_adjust=True, progress=False)
     if df.empty:
         raise ValueError(f"Yahoo returned no data for {ticker}")
-    close = df["Close"]
-    # Newer yfinance versions return a one-column DataFrame here; we want a Series.
-    if isinstance(close, pd.DataFrame):
-        close = close[ticker]
-    close.index = pd.to_datetime(close.index).tz_localize(None)
-    return close.dropna().rename(ticker)
+    # Newer yfinance versions label columns ("Close", ticker); keep just "Close".
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+    return df[["Open", "High", "Low", "Close", "Volume"]].dropna()
 
 
-def load_prices(ticker: str, refresh: bool = False) -> pd.Series:
-    """Load closes from data/<ticker>.csv, downloading them first if needed.
+def clean_prices(ohlcv: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Remove rows that aren't real trading days. Returns (kept rows, dropped rows).
+
+    The rule (Amendment 2 in PREREGISTRATION.md) is based only on what a real
+    trading day looks like, never on whether it helps the strategy:
+      1. Zero volume. A megabank never trades 0 shares on a day the exchange
+         is open, so these are filler rows (holidays, or days Yahoo is missing).
+      2. Open, High, Low, Close AND Volume all identical to the previous row.
+         Millions of shares trading at exactly the same four prices two days
+         running doesn't happen; it's the provider copying a row forward.
+    For rule 2 the FIRST row of a repeated block is kept (it's the real one).
+    """
+    zero_volume = ohlcv["Volume"] == 0
+    # shift(1) puts yesterday's row next to today's, so == compares them.
+    same_as_yesterday = (ohlcv == ohlcv.shift(1)).all(axis=1)
+    bad = zero_volume | same_as_yesterday
+    dropped = ohlcv[bad].assign(reason=["zero volume" if z else "copy of previous row"
+                                        for z in zero_volume[bad]])
+    return ohlcv[~bad], dropped
+
+
+def load_ohlcv(ticker: str, refresh: bool = False) -> pd.DataFrame:
+    """Load raw daily rows from data/<ticker>.csv, downloading them first if needed.
 
     Caching means every run uses the same numbers, and we don't hit Yahoo
     each time. Pass refresh=True to re-download (e.g. for the latest prices).
     """
     path = DATA_DIR / f"{ticker}.csv"
     if refresh or not path.exists():
-        prices = download_prices(ticker)
         DATA_DIR.mkdir(exist_ok=True)
-        prices.to_csv(path, index_label="date")
-    prices = pd.read_csv(path, index_col="date", parse_dates=True).iloc[:, 0]
-    return prices.rename(ticker)
+        download_prices(ticker).to_csv(path, index_label="date")
+    return pd.read_csv(path, index_col="date", parse_dates=True)
+
+
+def load_prices(ticker: str, refresh: bool = False) -> pd.Series:
+    """Cleaned daily closes for one ticker: what every other script should use."""
+    kept, _ = clean_prices(load_ohlcv(ticker, refresh))
+    return kept["Close"].rename(ticker)
 
 
 # ---------------------------------------------------------------- data quality

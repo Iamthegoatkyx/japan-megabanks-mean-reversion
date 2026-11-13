@@ -4,7 +4,7 @@ These use small made-up price series, so they never need the internet.
 """
 import pandas as pd
 
-from backtester.data import daily_cash_rate, find_gaps, find_jumps, find_stale
+from backtester.data import clean_prices, daily_cash_rate, find_gaps, find_jumps, find_stale
 
 
 def make_prices(values, start="2020-01-06"):
@@ -64,3 +64,32 @@ def test_cash_rate_uses_each_days_own_month_and_carries_forward():
     # January day -> January rate; February day -> February rate;
     # April isn't published yet -> carry February forward.
     assert list(daily) == [0.001, 0.002, 0.002]
+
+
+def make_ohlcv(rows, start="2020-01-06"):
+    """Rows of (open, high, low, close, volume) on consecutive business days."""
+    dates = pd.bdate_range(start, periods=len(rows))
+    return pd.DataFrame(rows, index=dates,
+                        columns=["Open", "High", "Low", "Close", "Volume"], dtype=float)
+
+
+def test_zero_volume_rows_are_dropped():
+    df = make_ohlcv([(10, 11, 9, 10, 500), (10, 10, 10, 10, 0), (10, 12, 10, 11, 700)])
+    kept, dropped = clean_prices(df)
+    assert list(kept["Close"]) == [10, 11]
+    assert list(dropped["reason"]) == ["zero volume"]
+
+
+def test_copied_rows_are_dropped_but_the_first_is_kept():
+    real = (20, 21, 19, 20, 1_000)
+    df = make_ohlcv([(19, 20, 18, 19, 900), real, real, real, (21, 22, 20, 22, 800)])
+    kept, dropped = clean_prices(df)
+    assert list(kept["Close"]) == [19, 20, 22]   # one copy of the real row survives
+    assert len(dropped) == 2
+
+
+def test_same_close_but_different_volume_is_a_real_day():
+    # A genuinely flat close is possible; only a fully identical row is suspicious.
+    df = make_ohlcv([(10, 11, 9, 10, 500), (10, 11, 9, 10, 650)])
+    kept, dropped = clean_prices(df)
+    assert len(kept) == 2 and dropped.empty
