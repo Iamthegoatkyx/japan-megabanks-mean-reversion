@@ -1,0 +1,8 @@
+# Python clutter
+__pycache__/
+.pytest_cache/
+.venv/
+
+# Downloaded prices are re-creatable, so we don't commit them.
+# (.gitkeep keeps the empty folder in the repo.)
+data/*.csv
