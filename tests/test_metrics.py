@@ -67,3 +67,42 @@ def test_win_rate_and_average_trade():
     assert s["Win rate"] == pytest.approx(0.5)
     assert s["Avg trade"] == pytest.approx(0.0)
     assert s["Avg days"] == pytest.approx(2)
+
+
+# ---------------------------------------------------------------- exit reasons
+
+def bt_with_ma(prices, position, ma):
+    dates = pd.bdate_range("2021-01-04", periods=len(prices))
+    return pd.DataFrame({"price": prices, "position": position, "ma": ma},
+                        index=dates, dtype=float)
+
+
+def test_exit_reason_back_to_ma():
+    # Bought row 1 (100), sold row 3. Decision day is row 2: close 105 >= MA 104.
+    bt = bt_with_ma([100, 100, 105, 110, 110], [0, 0, 1, 1, 0], [110, 110, 104, 104, 104])
+    assert trade_list(bt, 15)["exit_reason"].iloc[0] == "back to MA"
+
+
+def test_exit_reason_stop_loss():
+    # Bought row 1 at 100. Decision day row 2: close 89 <= 90 and below MA 95.
+    bt = bt_with_ma([100, 100, 89, 88, 88], [0, 0, 1, 1, 0], [110, 110, 95, 95, 95])
+    assert trade_list(bt, 15)["exit_reason"].iloc[0] == "stop-loss"
+
+
+def test_exit_reason_time_stop_with_the_real_rule():
+    # The drifting-down series from test_signals: the real signal exits on time.
+    from backtester.backtest import positions_from_signal
+    from backtester.signals import mean_reversion_signal
+    closes = [100, 100, 100, 100, 90] + [90 * 0.995 ** k for k in range(1, 21)]
+    prices = pd.Series(closes, index=pd.bdate_range("2021-01-04", periods=len(closes)))
+    signal = mean_reversion_signal(prices, window=4)
+    bt = pnl_from_positions(prices, positions_from_signal(signal), 15, 0.0)
+    bt["ma"] = prices.rolling(4).mean()
+    trades = trade_list(bt, 15)
+    assert list(trades["exit_reason"]) == ["time stop"]
+    assert trades["days_held"].iloc[0] == 15
+
+
+def test_exit_reason_is_open_for_unfinished_trade():
+    bt = bt_with_ma([100, 100, 90, 95], [0, 0, 1, 1], [110] * 4)
+    assert trade_list(bt, 15)["exit_reason"].iloc[0] == "open"

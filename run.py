@@ -12,6 +12,8 @@ Writes outputs/<period>/<bank>/results.md (+ equity_drawdown.png, trades.csv)
 and outputs/<period>/portfolio/results.md with the preregistered test.
 """
 import argparse
+
+import pandas as pd
 from pathlib import Path
 
 from backtester import config
@@ -20,7 +22,7 @@ from backtester.experiments import (common_dates, cost_sensitivity, criteria_mar
                                     preregistered_test, run_universe)
 from backtester.metrics import markdown_table, summarize, summarize_portfolio, trade_list
 from backtester.plots import cost_chart
-from backtester.report import data_fingerprint, write_results
+from backtester.report import breakdown_markdown, data_fingerprint, write_results
 
 
 def main() -> None:
@@ -64,7 +66,11 @@ def main() -> None:
                preregistered_bps=cost)
     test = preregistered_test(strategies, benchmarks, period)
 
+    # All closed trades of the three banks together (each bank's own period).
+    all_trades = pd.concat([trade_list(bt, cost) for bt in strategies.values()])
     extra = [criteria_markdown(test, period), "",
+             breakdown_markdown(all_trades).replace("### Why trades ended",
+                                                    "## Why trades ended, all three banks"), "",
              "## Cost sensitivity", "", "```", costs.round(3).to_string(), "```", "",
              "![Cost sensitivity](../cost_sensitivity.png)"]
     if period == "in-sample":

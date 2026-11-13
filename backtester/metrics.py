@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from . import config
 from .backtest import TRADING_DAYS
 
 
@@ -48,7 +49,26 @@ def max_drawdown(net: pd.Series) -> float:
 
 # ---------------------------------------------------------------- trades
 
-def trade_list(bt: pd.DataFrame, cost_bps: float, max_gap_days: int = 7) -> pd.DataFrame:
+def exit_reason(bt: pd.DataFrame, buy: int, end: int, max_hold: int, stop_loss: float) -> str:
+    """Which exit rule ended the trade bought at row `buy` and sold at row `end`.
+
+    The exit DECISION was made one row before the sale (end - 1), so that's the
+    close we look at. The checks are in the same order as mean_reversion_signal.
+    """
+    signal_day = end - 1
+    close = bt["price"].iloc[signal_day]
+    if close >= bt["ma"].iloc[signal_day]:
+        return "back to MA"
+    if end - buy + 1 == max_hold:
+        return "time stop"
+    if close <= (1 - stop_loss) * bt["price"].iloc[buy]:
+        return "stop-loss"
+    return "unknown"   # should never happen; if it does, the rule and this disagree
+
+
+def trade_list(bt: pd.DataFrame, cost_bps: float, max_gap_days: int = 7,
+               max_hold: int = config.MAX_HOLD_DAYS,
+               stop_loss: float = config.STOP_LOSS) -> pd.DataFrame:
     """One row per trade, built from the `position` column of a backtest.
 
     A trade is a run of consecutive days with position 1. If position is 1 on
@@ -63,6 +83,8 @@ def trade_list(bt: pd.DataFrame, cost_bps: float, max_gap_days: int = 7) -> pd.D
                             more than `max_gap_days` calendar days apart
                             (missing data, see PREREGISTRATION.md Amendment 2)
       open                : True if still holding on the last day of data
+      exit_reason         : "back to MA", "time stop", "stop-loss" or "open"
+                            (only if bt has an "ma" column, else empty)
     """
     position = bt["position"].to_numpy()
     prices = bt["price"]
@@ -93,9 +115,24 @@ def trade_list(bt: pd.DataFrame, cost_bps: float, max_gap_days: int = 7) -> pd.D
             "net_return": net,
             "crosses_gap": bool((span > max_gap_days).any()),
             "open": still_open,
+            "exit_reason": ("open" if still_open
+                            else exit_reason(bt, buy, end, max_hold, stop_loss)
+                            if "ma" in bt else ""),
         })
-    return pd.DataFrame(trades, columns=["buy_date", "sell_date", "days_held",
-                                         "net_return", "crosses_gap", "open"])
+    return pd.DataFrame(trades, columns=["buy_date", "sell_date", "days_held", "net_return",
+                                         "crosses_gap", "open", "exit_reason"])
+
+
+def exit_breakdown(trades: pd.DataFrame) -> pd.DataFrame:
+    """Closed trades grouped by why they ended: count, win rate, average and total return."""
+    closed = trades[~trades["open"]]
+    groups = closed.groupby("exit_reason")["net_return"]
+    return pd.DataFrame({
+        "trades": groups.size(),
+        "win_rate": groups.apply(lambda r: (r > 0).mean()),
+        "avg_return": groups.mean(),
+        "sum_of_returns": groups.sum(),
+    })
 
 
 # ---------------------------------------------------------------- summary

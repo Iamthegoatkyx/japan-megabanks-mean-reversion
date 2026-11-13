@@ -37,6 +37,9 @@ def backtest_bank(ticker: str, period: str, cost_bps: float, monthly_cash: pd.Se
     cash = daily_cash_rate(monthly_cash, prices.index)
     signal = mean_reversion_signal(prices, **signal_kwargs)
     strategy = run_backtest(prices, signal, cost_bps, cash, delay=config.EXECUTION_DELAY)
+    # Keep the moving average next to each day, computed on the FULL history
+    # (before slicing), so trade_list can tell why each trade ended.
+    strategy["ma"] = prices.rolling(window).mean()
 
     if period == "in-sample":
         # First day the strategy COULD hold the stock: MA warm-up (window - 1 rows),

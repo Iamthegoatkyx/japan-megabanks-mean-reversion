@@ -35,6 +35,14 @@ Partial-result check:
 
 Bootstrap: 5000 resamples, 21-day blocks, observed difference -0.111, share of resamples where the strategy is not better: 62.3%.
 
+## Why trades ended, all three banks (closed trades)
+
+| Exit | Trades | Win rate | Avg return | Sum of returns |
+|---|---:|---:|---:|---:|
+| back to MA | 111 | 92.8% | +5.37% | +5.96 |
+| stop-loss | 31 | 0.0% | -11.34% | -3.52 |
+| time stop | 57 | 17.5% | -3.54% | -2.02 |
+
 ## Cost sensitivity
 
 ```
