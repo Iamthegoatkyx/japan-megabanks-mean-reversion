@@ -4,13 +4,23 @@ Written before any backtest on real data. Any later change must be a separate,
 dated "Amendment" commit at the bottom of this file, with the reason, so the
 git history shows it.
 
+> Amended 2026-11-13 (Amendment 1): universe changed from Singapore to Japan
+> banks before any price data was downloaded. See the bottom of this file.
+
 ## Question
-Do DBS (D05.SI), OCBC (O39.SI) and UOB (U11.SI) bounce back after sharp drops
-enough to beat buy-and-hold of the same stocks after trading costs?
+Do Japan's three megabanks, MUFG (8306.T), SMFG (8316.T) and Mizuho (8411.T),
+bounce back after sharp drops enough to beat buy-and-hold of the same stocks
+after trading costs?
 
 ## Data
 - Daily dividend-adjusted closes from Yahoo Finance (yfinance, `auto_adjust=True`).
 - Signals use closing prices only.
+- All returns are in JPY. No currency conversion.
+- Cash rate: Japan immediate rate (call money / interbank), % per year, monthly,
+  OECD Main Economic Indicators via FRED, series `IRSTCI01JPM156N`.
+  Each trading day earns the rate of its calendar month, converted to a daily
+  rate. Negative values are used as published (no floor at 0%). If the latest
+  month is not yet published, the last available value is carried forward.
 
 ## The rule (identical for all three banks, no per-stock tuning)
 - **Moving average (MA):** simple average of the last 20 closes, including today.
@@ -27,12 +37,13 @@ enough to beat buy-and-hold of the same stocks after trading costs?
   3. Stop-loss: close <= 0.90 × entry price. Because the sale happens at the
      next close, the realised loss can be larger than 10%.
 - **Reset after any exit:** no new entry signal until a close at or above the MA.
-- **Out of the market:** cash earns 2% a year.
+- **Out of the market:** cash earns the JPY short-term rate described under Data.
 - **Costs:** 15 bps per side (30 bps per round trip).
 
 ## Benchmark
-Buy-and-hold of the same stock, dividends included, same 15 bps costs,
-measured over exactly the same dates as the strategy.
+Buy-and-hold of the same stock, dividends included, in JPY, same 15 bps costs,
+measured over exactly the same dates as the strategy. For the main test: an
+equal-weight buy-and-hold of the three banks (see below).
 
 ## Samples
 - In-sample: start of data to 2017-12-31.
@@ -66,4 +77,18 @@ Per-bank results are reported but are secondary. They cannot turn a failed
 main test into a success.
 
 ## Amendments
-_None yet._
+
+### Amendment 1 — 2026-11-13 — change of universe (before any price data)
+- **Changed:** main universe from DBS / OCBC / UOB (Singapore, SGD) to
+  MUFG / SMFG / Mizuho (Japan, JPY). Cash rate changed from a flat 2% a year to
+  the Japan short-term rate series above, since a JPY strategy's idle cash
+  would earn JPY rates.
+- **Unchanged:** 20-day MA, 5% entry, 15-day max hold, 10% stop from the t+1
+  entry price, reset rule, 15 bps per side, 2018-01-01 split, success criteria.
+- **Why:** to match the NUSSIF team's focus markets (Japan, Korea, China).
+- **Evidence it was made blind:** at the time of this change no stock prices
+  had been downloaded (the `data/` folder was empty). The only data looked at
+  was the cash-rate series itself.
+- **Possible later robustness universes** (Korea, Hong Kong) are not part of
+  the main test and may use their own cost assumptions, set in
+  `backtester/config.py`.
