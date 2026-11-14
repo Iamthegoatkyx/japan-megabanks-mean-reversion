@@ -63,6 +63,12 @@ pytest                         # all tests should pass
 | `python dashboard.py` | interactive charts: `outputs/dashboard.html` and the 3D grid `outputs/parameter_surface_3d.html` (visualisation only) |
 | `python live_signal.py` | paper trading: today's signal per bank, appended to `paper_log.csv` (run after the Tokyo close) |
 
+`check_data.py`, `run.py` and `robustness.py` also take `--universe us_chips`
+for the US robustness test (NVDA, AMD, INTC, preregistered in
+[PREREGISTRATION_US.md](PREREGISTRATION_US.md)). Its results go to
+`outputs/us_chips/`, so they never overwrite the Japan results. The dashboard
+and `live_signal.py` cover Japan only.
+
 Prices are cached in `data/` (not committed; each `results.md` records the
 download date and a SHA-256 of the file used). Yahoo revises adjusted prices
 over time, so a fresh download can give slightly different numbers.
@@ -71,7 +77,7 @@ over time, so a fresh download can give slightly different numbers.
 
 ```
 backtester/
-  config.py       every setting: the rule, the split date, the universe
+  config.py       every setting: the rule, the split date, the universes
   data.py         download, cache, cleaning, quality checks, cash rate
   signals.py      mean_reversion_signal: the rule, as a three-state loop
   backtest.py     signal -> positions (traded one day later) -> returns after costs
@@ -81,12 +87,17 @@ backtester/
   plots.py        charts
   report.py       results.md files
 tests/            pytest tests for all of the above
-outputs/          results and charts, per period and per bank
+outputs/          results and charts, per period and per bank (Japan)
+  us_chips/       the same for the US robustness test
+PREREGISTRATION.md      the Japan test, fixed before any data
+PREREGISTRATION_US.md   the US robustness test, fixed before any US data
 ```
 
 Where the numbers are: [in-sample portfolio](outputs/in-sample/portfolio/results.md),
 [out-of-sample portfolio](outputs/out-of-sample/portfolio/results.md), and one
-folder per bank next to each.
+folder per bank next to each. US robustness test:
+[in-sample portfolio](outputs/us_chips/in-sample/portfolio/results.md),
+[out-of-sample portfolio](outputs/us_chips/out-of-sample/portfolio/results.md).
 
 ## Results
 
