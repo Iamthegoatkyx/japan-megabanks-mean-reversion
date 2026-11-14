@@ -154,3 +154,36 @@ rule beat buy-and-hold; my pre-registered cell scored -0.07.
   and no taxes, so market impact and price gaps within a day aren't modelled.
 - **Weekly paper log:** checking once a week misses trades that start and
   end within the same week.
+
+## US robustness test
+
+To check whether the Japan result was specific to Japan, I pre-registered
+the same rule on three US chip stocks (NVDA, AMD, INTC) before downloading
+any US data, with costs of 5 bps per side. I admitted in the file that I
+chose these stocks knowing NVDA had risen a lot.
+
+It failed three of the four criteria, and the partial-result test; it only
+met the minimum of 20 trades, with 149. Out-of-sample (2018-01-02 to
+2026-11-13), the portfolio's Sharpe was 0.23 against 0.93 for buy-and-hold
+(CAGR 5.2% vs 40.1%), and the 95% bootstrap interval for the Sharpe gap was
+[-1.28, -0.12]. The drawdown was 26.8 points smaller, consistent with being
+in the market only 18.6% of the time.
+
+My hypothesis was partly right. The rule traded far more often (149 trades
+against 60 in Japan) and hit the stop-loss more often: 31 of 149 trades
+(21%) against 10 of 60 (17%) in Japan. The average stop-loss was about the
+same in both (-12.1% vs -12.2%). The Japan exit figures come from
+recomputing the out-of-sample run with the same code; they aren't in the
+committed results files.
+
+I predicted it would do worse than in Japan. Whether it did depends on the
+measure. By Sharpe gap at each test's own cost, the US gap was smaller
+(-0.71 vs -0.84), but the costs differ (5 bps vs 15 bps); at the same
+25 bps the gaps are much closer (-0.83 vs -0.89). By CAGR, the US gap was
+larger (about 35 points vs about 22).
+
+Across both tests, the rule lagged badly in strong rallies (NVDA, AMD,
+Japanese banks after 2018) and roughly kept up only where buy-and-hold
+earned little (Intel: buy-and-hold CAGR 4.8%, Sharpe 0.27 vs 0.29). That
+suggests its relative performance depends mostly on the market regime.
+That's a hypothesis from secondary results, not a tested finding.
