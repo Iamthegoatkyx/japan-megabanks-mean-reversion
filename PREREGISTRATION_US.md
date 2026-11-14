@@ -85,5 +85,22 @@ with 1/3 in buy-and-hold of each. The strategy "works" only if ALL hold:
 Per-stock results are reported but are secondary. They cannot turn a failed
 main test into a success.
 
+## In-sample data check (2026-11-14, no change to anything above)
+Run with `python check_data.py --universe us_chips`, in-sample prices only.
+No signal, trade or return of the strategy was computed.
+- **Cleaning removed 3 rows, all zero volume:** AMD 1982-10-05 and 2015-01-02,
+  INTC 1981-08-10. AMD 2015-01-02 was a normal NYSE trading day, so it is a
+  day missing from Yahoo; its price move moves into the next row.
+- **Stale runs (5+ identical closes):** AMD 1990-12-11 to 17 and INTC
+  1986-12-16 to 22. Kept: volume, High and Low change every day, so these
+  are real trading days. Before 2001, US prices moved in steps of 1/8 or 1/16
+  of a dollar, so an unchanged close was common. Both are before 1999, so
+  neither is in the portfolio.
+- **Gaps over 7 calendar days:** none.
+- **Daily moves over 20%:** NVDA 16, AMD 17, INTC 3. Kept, as in the Japan
+  test (no rule removes large moves). Not checked against a second source.
+- **Entry episodes (upper bound):** NVDA 5.71, AMD 6.16, INTC 4.52 a year.
+  Recorded for comparison only; the 5% threshold is locked for this test.
+
 ## Amendments
 _None yet._
