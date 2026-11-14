@@ -165,6 +165,10 @@ rule beat buy-and-hold; my pre-registered cell scored -0.07.
   and no taxes, so market impact and price gaps within a day aren't modelled.
 - **Weekly paper log:** checking once a week misses trades that start and
   end within the same week.
+- **US stock choice:** I picked NVDA, AMD and INTC knowing NVDA had risen
+  a lot, so the US test isn't free of hindsight.
+- **US data:** chip stocks have large daily moves, and I didn't check them
+  against a second data source.
 
 ## US robustness test
 
