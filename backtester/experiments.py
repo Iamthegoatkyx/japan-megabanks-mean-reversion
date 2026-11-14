@@ -59,13 +59,15 @@ def backtest_bank(ticker: str, period: str, cost_bps: float, monthly_cash: pd.Se
 
 
 def run_universe(period: str, cost_bps: float | None = None,
-                 signal_kwargs: dict | None = None, earliest_start=None):
-    """Backtest every bank in the main universe. Returns ({name: strategy}, {name: benchmark})."""
-    universe = config.UNIVERSES[config.MAIN_UNIVERSE]
-    cost = universe["cost_bps"] if cost_bps is None else cost_bps
-    monthly_cash = load_cash_rate(universe["cash_rate_fred_id"])
+                 signal_kwargs: dict | None = None, earliest_start=None,
+                 universe: str = config.MAIN_UNIVERSE):
+    """Backtest every stock in a universe (default: the main, Japan one).
+    Returns ({name: strategy}, {name: benchmark})."""
+    settings = config.UNIVERSES[universe]
+    cost = settings["cost_bps"] if cost_bps is None else cost_bps
+    monthly_cash = load_cash_rate(settings["cash_rate_fred_id"])
     strategies, benchmarks = {}, {}
-    for ticker, name in universe["tickers"].items():
+    for ticker, name in settings["tickers"].items():
         strategies[name], benchmarks[name] = backtest_bank(
             ticker, period, cost, monthly_cash, signal_kwargs, earliest_start)
     return strategies, benchmarks
@@ -78,11 +80,12 @@ def common_dates(bts: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     return {name: bt.loc[start:end] for name, bt in bts.items()}
 
 
-def cost_sensitivity(period: str, costs=(0, 10, 25, 50)) -> pd.DataFrame:
+def cost_sensitivity(period: str, costs=(0, 10, 25, 50),
+                     universe: str = config.MAIN_UNIVERSE) -> pd.DataFrame:
     """Portfolio Sharpe of strategy and buy-and-hold at each cost level (bps per side)."""
     rows = []
     for cost in costs:
-        strategies, benchmarks = run_universe(period, cost_bps=cost)
+        strategies, benchmarks = run_universe(period, cost_bps=cost, universe=universe)
         s = summarize_portfolio(common_dates(strategies), cost)
         b = summarize_portfolio(common_dates(benchmarks), cost)
         rows.append({"cost_bps": cost, "strategy_sharpe": s["Sharpe"],
@@ -91,7 +94,7 @@ def cost_sensitivity(period: str, costs=(0, 10, 25, 50)) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("cost_bps")
 
 
-def parameter_grid(thresholds, windows) -> pd.DataFrame:
+def parameter_grid(thresholds, windows, universe: str = config.MAIN_UNIVERSE) -> pd.DataFrame:
     """Portfolio Sharpe (strategy minus buy-and-hold) for every (threshold, window).
 
     IN-SAMPLE ONLY, by design: there is no `period` argument, so this can never
@@ -99,16 +102,17 @@ def parameter_grid(thresholds, windows) -> pd.DataFrame:
     same dates: from the point where even the longest window has warmed up.
     """
     # Find the latest first-tradable date across banks for the LONGEST window.
-    probe, _ = run_universe("in-sample", signal_kwargs={"window": max(windows)})
+    probe, _ = run_universe("in-sample", signal_kwargs={"window": max(windows)},
+                            universe=universe)
     earliest = max(bt.index[0] for bt in probe.values())
 
-    cost = config.UNIVERSES[config.MAIN_UNIVERSE]["cost_bps"]
+    cost = config.UNIVERSES[universe]["cost_bps"]
     rows = []
     for threshold in thresholds:
         for window in windows:
             kwargs = {"entry_below": threshold, "window": window}
             strategies, benchmarks = run_universe("in-sample", signal_kwargs=kwargs,
-                                                  earliest_start=earliest)
+                                                  earliest_start=earliest, universe=universe)
             s = summarize_portfolio(common_dates(strategies), cost)
             b = summarize_portfolio(common_dates(benchmarks), cost)
             rows.append({"threshold": threshold, "window": window,
@@ -118,29 +122,32 @@ def parameter_grid(thresholds, windows) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def preregistered_test(strategies: dict, benchmarks: dict, period: str) -> dict:
-    """Apply the success criteria from PREREGISTRATION.md, mechanically.
+def preregistered_test(strategies: dict, benchmarks: dict, period: str,
+                       universe: str = config.MAIN_UNIVERSE) -> dict:
+    """Apply the success criteria from PREREGISTRATION.md (the same criteria are
+    used in PREREGISTRATION_US.md), mechanically.
 
-    `strategies` / `benchmarks` are the 15 bps backtests from run_universe.
+    `strategies` / `benchmarks` are the backtests from run_universe at the
+    universe's own cost (15 bps for Japan, 5 bps for the US).
     This only checks the written rules; what the result MEANS is for the README.
     """
     from .backtest import equal_weight, portfolio_cash
     from .stats import bootstrap_sharpe_diff
 
     port_s, port_b = common_dates(strategies), common_dates(benchmarks)
-    cost = config.UNIVERSES[config.MAIN_UNIVERSE]["cost_bps"]
+    cost = config.UNIVERSES[universe]["cost_bps"]
     s, b = summarize_portfolio(port_s, cost), summarize_portfolio(port_b, cost)
     boot = bootstrap_sharpe_diff(
         equal_weight({n: bt["net"] for n, bt in port_s.items()}),
         equal_weight({n: bt["net"] for n, bt in port_b.items()}),
         portfolio_cash(port_s))
 
-    s25_runs, b25_runs = run_universe(period, cost_bps=25)
+    s25_runs, b25_runs = run_universe(period, cost_bps=25, universe=universe)
     s25 = summarize_portfolio(common_dates(s25_runs), 25)
     b25 = summarize_portfolio(common_dates(b25_runs), 25)
 
     criteria = [
-        ("1. Sharpe higher than buy & hold at 15 bps",
+        (f"1. Sharpe higher than buy & hold at {cost:g} bps",
          f"{s['Sharpe']:.2f} vs {b['Sharpe']:.2f}", s["Sharpe"] > b["Sharpe"]),
         ("2. 95% bootstrap interval of Sharpe difference entirely above 0",
          f"[{boot['ci_low']:.2f}, {boot['ci_high']:.2f}]", boot["ci_low"] > 0),

@@ -3,6 +3,7 @@
 Usage:
     python check_data.py            # in-sample period only (the default)
     python check_data.py --full     # whole history, incl. out-of-sample
+    python check_data.py --universe us_chips   # any universe in config.UNIVERSES
 
 The default looks at IN-SAMPLE data only. PREREGISTRATION.md promises not to
 look at anything out-of-sample until the threshold decision is locked.
@@ -47,11 +48,13 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--full", action="store_true", help="include out-of-sample data")
     parser.add_argument("--refresh", action="store_true", help="re-download from Yahoo")
+    parser.add_argument("--universe", choices=list(config.UNIVERSES),
+                        default=config.MAIN_UNIVERSE)
     args = parser.parse_args()
 
-    universe = config.UNIVERSES[config.MAIN_UNIVERSE]
+    universe = config.UNIVERSES[args.universe]
     split = pd.Timestamp(config.OUT_OF_SAMPLE_START)
-    print(f"Universe: {config.MAIN_UNIVERSE}  |  period: "
+    print(f"Universe: {args.universe}  |  period: "
           f"{'FULL history' if args.full else f'in-sample only (before {split.date()})'}\n")
 
     for ticker, name in universe["tickers"].items():

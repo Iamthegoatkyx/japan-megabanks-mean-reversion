@@ -4,6 +4,7 @@ To add a robustness universe later (e.g. Korean or Hong Kong banks), add an
 entry to UNIVERSES with its own tickers, currency, costs and cash rate.
 Do NOT touch the RULE settings: they are fixed by PREREGISTRATION.md.
 """
+from pathlib import Path
 
 # --- The trading rule (fixed by PREREGISTRATION.md, same for every universe) ---
 MA_WINDOW = 20          # moving average length, in trading days
@@ -25,8 +26,27 @@ UNIVERSES = {
         "cost_bps": 15.0,   # per side
         # Japan overnight call rate, % per year, monthly (OECD via FRED).
         "cash_rate_fred_id": "IRSTCI01JPM156N",
+        "cash_rate_name": "JPY call rate",
+        "noun": "banks",
+    },
+    # Robustness test, preregistered separately in PREREGISTRATION_US.md.
+    "us_chips": {
+        "tickers": {"NVDA": "NVIDIA", "AMD": "AMD", "INTC": "Intel"},
+        "currency": "USD",
+        "cost_bps": 5.0,    # per side (very liquid US large caps)
+        # US effective federal funds rate, % per year, monthly (FRED).
+        "cash_rate_fred_id": "FEDFUNDS",
+        "cash_rate_name": "USD fed funds rate",
+        "noun": "stocks",
     },
 }
 
 # The universe used for the preregistered main test.
 MAIN_UNIVERSE = "japan_megabanks"
+
+
+def output_root(universe: str) -> Path:
+    """Where a universe's results go. The main (Japan) test keeps outputs/ as it
+    was; every other universe gets its own folder, outputs/<universe>/, so a
+    robustness run can never overwrite the main results."""
+    return Path("outputs") if universe == MAIN_UNIVERSE else Path("outputs") / universe
