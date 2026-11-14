@@ -3,7 +3,8 @@ from pathlib import Path
 
 from backtester import config
 
-NEEDED = {"tickers", "currency", "cost_bps", "cash_rate_fred_id", "cash_rate_name", "noun"}
+NEEDED = {"tickers", "currency", "cost_bps", "cash_rate_fred_id", "cash_rate_name", "noun",
+          "preregistration"}
 
 
 def test_every_universe_has_every_setting_the_scripts_use():

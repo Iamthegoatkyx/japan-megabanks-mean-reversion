@@ -28,6 +28,7 @@ UNIVERSES = {
         "cash_rate_fred_id": "IRSTCI01JPM156N",
         "cash_rate_name": "JPY call rate",
         "noun": "banks",
+        "preregistration": "PREREGISTRATION.md",
     },
     # Robustness test, preregistered separately in PREREGISTRATION_US.md.
     "us_chips": {
@@ -38,6 +39,7 @@ UNIVERSES = {
         "cash_rate_fred_id": "FEDFUNDS",
         "cash_rate_name": "USD fed funds rate",
         "noun": "stocks",
+        "preregistration": "PREREGISTRATION_US.md",
     },
 }
 

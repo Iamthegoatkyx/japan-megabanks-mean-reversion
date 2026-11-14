@@ -46,7 +46,7 @@ def main() -> None:
                     f"`{universe['cash_rate_fred_id']}`.",
                     f"Rule: {config.ENTRY_BELOW_MA:.0%} below the {config.MA_WINDOW}-day MA, "
                     f"max hold {config.MAX_HOLD_DAYS} days, stop {config.STOP_LOSS:.0%}, "
-                    "reset rule (see PREREGISTRATION.md)."]
+                    f"reset rule (see {universe['preregistration']})."]
 
     strategies, benchmarks = run_universe(period, universe=uname)
     all_rows = {}
